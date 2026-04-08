@@ -1,0 +1,61 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>o_bergen.LiveResultManager</RootNamespace>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Production build settings -->
+    <AssemblyName>LiveResultManager</AssemblyName>
+    <Version>1.0.0</Version>
+    <Authors>O-Bergen</Authors>
+    <Product>Live Result Manager</Product>
+    <Description>Manages and transfers orienteering race results to live platforms</Description>
+
+    <!-- Optimization for Release builds -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">true</DebugSymbols>
+    <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Configuration and Dependency Injection -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+
+    <!-- Data Access -->
+    <PackageReference Include="System.Data.Odbc" Version="9.0.0" />
+
+    <!-- Supabase (use working version from existing project) -->
+    <PackageReference Include="Supabase" Version="1.1.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude BackgroundSource from build -->
+    <Compile Remove="BackgroundSource\**" />
+    <EmbeddedResource Remove="BackgroundSource\**" />
+    <None Remove="BackgroundSource\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="BackgroundSource\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ensure appsettings.json files are copied to output -->
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
