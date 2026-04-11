@@ -6,12 +6,20 @@ The Invalid Stretch feature allows race organizers to mark specific control-to-c
 
 ## Use Case
 
-Sometimes during a race, a particular stretch between two controls becomes invalid due to:
-- Dangerous/blocked paths
+After a race is completed, it may be determined that a particular stretch between two controls was invalid due to:
+- Dangerous/blocked paths discovered during the race
 - Incorrectly placed controls
 - Course changes made during the event
+- Safety incidents requiring route changes
 
-Rather than manually adjusting all results in the timing system, this feature allows you to configure the invalid stretch once, and all affected results are automatically adjusted.
+Since this determination is made **after the race**, this feature allows you to retroactively adjust results by configuring the invalid stretch once, and all affected results are automatically adjusted.
+
+## Design Philosophy
+
+**Split times are preserved** - The split times represent the actual data from the runner's SI-card (e-card). Even though a stretch is invalid, the runner did physically visit those controls and the timestamps are factual. Therefore:
+- Split times remain unchanged
+- Only the final time is adjusted
+- The final time will NOT equal the sum of split times (this is intentional and correct)
 
 ## How It Works
 
@@ -122,6 +130,9 @@ The UI enforces:
 
 **Integration:**
 - `ResultTransferService.cs` - Modified to apply adjustments before sending to Supabase
+  - **Only adjusts final time** (`result.Time`)
+  - **Preserves all split times** (factual SI-card data)
+  - Adds adjustment description to status message
 - `Form1.cs` - Added button and event metadata tracking
 - `InvalidStretchManagementForm.cs` - UI dialog
 
