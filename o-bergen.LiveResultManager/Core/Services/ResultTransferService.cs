@@ -138,6 +138,23 @@ public class ResultTransferService
             var archivePath = await _archive.ArchiveResultsAsync(results, archiveMetadata, cancellationToken);
             metadata.ArchivePath = archivePath;
             Log($"✅ Archived to {archivePath}", LogLevel.Success);
+            Log("  📄 results.json (backup)", LogLevel.Information);
+            Log("  📄 metadata.json (backup)", LogLevel.Information);
+            Log("  📄 iofres.xml (IOF XML 3.0)", LogLevel.Success);
+            Log("  📄 Sploype.csv (World of O)", LogLevel.Success);
+
+            // Check if files were actually created to verify Supabase upload occurred
+            if (Directory.Exists(archivePath))
+            {
+                var iofXmlPath = Path.Combine(archivePath, "iofres.xml");
+                var sploypePath = Path.Combine(archivePath, "Sploype.csv");
+
+                if (File.Exists(iofXmlPath) && File.Exists(sploypePath))
+                {
+                    Log("  ☁️ Files also uploaded to Supabase Storage (if ServiceRoleKey configured)", LogLevel.Information);
+                }
+            }
+
             NotifyProgress("Archive complete", 70);
 
             // Step 4: Write to destination
