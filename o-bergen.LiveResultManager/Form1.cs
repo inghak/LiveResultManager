@@ -103,7 +103,7 @@ public partial class Form1 : Form
         Log("Log cleared.", LogLevel.Info);
     }
 
-    private void btnManageStretches_Click(object sender, EventArgs e)
+    private async void btnManageStretches_Click(object sender, EventArgs e)
     {
         if (_invalidStretchService == null)
         {
@@ -113,6 +113,12 @@ public partial class Form1 : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
             return;
+        }
+
+        // Load event metadata if not already loaded
+        if (_currentEventMetadata == null)
+        {
+            await LoadEventMetadataAsync();
         }
 
         using var form = new InvalidStretchManagementForm(_invalidStretchService, _currentEventMetadata);
@@ -170,6 +176,12 @@ public partial class Form1 : Form
         {
             var metadata = await _transferService.ExecuteTransferAsync(_cancellationTokenSource?.Token ?? default);
 
+            // Store event metadata for invalid stretch management
+            if (metadata.EventMetadata != null)
+            {
+                _currentEventMetadata = metadata.EventMetadata;
+            }
+
             // Update statistics
             if (metadata.Success)
             {
@@ -194,6 +206,34 @@ public partial class Form1 : Form
             Log($"Transfer error: {ex.Message}", LogLevel.Error);
             _statistics.RecordError();
             this.Invoke(() => UpdateStatisticsUI());
+        }
+    }
+
+    private async Task LoadEventMetadataAsync()
+    {
+        try
+        {
+            Log("Loading event metadata from database...", LogLevel.Info);
+
+            // Check if source is AccessDB
+            if (_resultSource is Infrastructure.Sources.AccessDbResultSource accessDbSource)
+            {
+                _currentEventMetadata = await accessDbSource.FetchMetadataAsync(CancellationToken.None);
+                Log($"Event metadata loaded: {_currentEventMetadata.Name} on {_currentEventMetadata.Date:yyyy-MM-dd}", LogLevel.Success);
+            }
+            else
+            {
+                Log("Event metadata loading is only supported for AccessDB source.", LogLevel.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to load event metadata: {ex.Message}", LogLevel.Error);
+            MessageBox.Show(
+                $"Failed to load event metadata: {ex.Message}",
+                "Error",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
     }
 

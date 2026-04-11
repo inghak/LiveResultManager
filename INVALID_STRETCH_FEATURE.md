@@ -238,7 +238,8 @@ Expected behavior:
 ## Troubleshooting
 
 **Problem:** "Cannot add stretch: No event metadata loaded"
-- **Solution:** Run a transfer first to load event metadata
+- **Solution:** This should no longer occur - metadata is loaded automatically from AccessDB
+- If it still occurs, check that the AccessDB path is correct and the database is accessible
 
 **Problem:** Stretches not being applied to results
 - **Solution:** Check that:

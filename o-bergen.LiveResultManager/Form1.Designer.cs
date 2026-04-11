@@ -102,16 +102,16 @@
             grpControls.Controls.Add(btnStart);
             grpControls.Location = new Point(12, 88);
             grpControls.Name = "grpControls";
-            grpControls.Size = new Size(960, 70);
+            grpControls.Size = new Size(470, 100);
             grpControls.TabIndex = 1;
             grpControls.TabStop = false;
             grpControls.Text = "Controls";
             // 
             // btnManageStretches
             // 
-            btnManageStretches.Location = new Point(468, 22);
+            btnManageStretches.Location = new Point(6, 60);
             btnManageStretches.Name = "btnManageStretches";
-            btnManageStretches.Size = new Size(180, 35);
+            btnManageStretches.Size = new Size(458, 35);
             btnManageStretches.TabIndex = 3;
             btnManageStretches.Text = "Manage Invalid Stretches";
             btnManageStretches.UseVisualStyleBackColor = true;
@@ -119,7 +119,7 @@
             // 
             // btnClearLog
             // 
-            btnClearLog.Location = new Point(314, 22);
+            btnClearLog.Location = new Point(324, 22);
             btnClearLog.Name = "btnClearLog";
             btnClearLog.Size = new Size(140, 35);
             btnClearLog.TabIndex = 2;
@@ -156,7 +156,7 @@
             grpConfiguration.Controls.Add(btnBrowseDb);
             grpConfiguration.Controls.Add(txtAccessDbPath);
             grpConfiguration.Controls.Add(lblAccessDb);
-            grpConfiguration.Location = new Point(12, 164);
+            grpConfiguration.Location = new Point(12, 194);
             grpConfiguration.Name = "grpConfiguration";
             grpConfiguration.Size = new Size(470, 130);
             grpConfiguration.TabIndex = 2;
@@ -226,7 +226,7 @@
             grpStatistics.Controls.Add(lblRecordsRead);
             grpStatistics.Location = new Point(488, 88);
             grpStatistics.Name = "grpStatistics";
-            grpStatistics.Size = new Size(484, 206);
+            grpStatistics.Size = new Size(484, 236);
             grpStatistics.TabIndex = 3;
             grpStatistics.TabStop = false;
             grpStatistics.Text = "Statistics";
