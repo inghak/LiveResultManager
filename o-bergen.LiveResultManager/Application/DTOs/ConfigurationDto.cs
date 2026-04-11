@@ -29,6 +29,7 @@ public record SupabaseConfig
 {
     public string Url { get; init; } = string.Empty;
     public string ApiKey { get; init; } = string.Empty;
+    public string TableName { get; init; } = "live_results";
 }
 
 /// <summary>

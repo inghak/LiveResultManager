@@ -59,6 +59,8 @@ public static class DependencyInjection
         services.AddSingleton<SourceToJsonMapper>();
         services.AddSingleton<JsonToDestinationMapper>();
         services.AddSingleton<MetadataMapper>();
+        services.AddSingleton<IofXmlMapper>();
+        services.AddSingleton<SploypeCsvMapper>();
 
         // Register Logger
         if (loggingConfig.EnableFileLogging && !string.IsNullOrEmpty(loggingConfig.LogPath))
@@ -102,7 +104,34 @@ public static class DependencyInjection
             if (string.IsNullOrEmpty(basePath))
                 basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Archive");
 
-            return new JsonFileArchive(basePath);
+            var archives = new List<IResultArchive>();
+
+            // JSON Archive
+            archives.Add(new JsonFileArchive(basePath));
+
+            // IOF XML Archive
+            var iofMapper = sp.GetRequiredService<IofXmlMapper>();
+            archives.Add(new IofXmlArchive(basePath, iofMapper));
+
+            // Sploype CSV Archive
+            var csvMapper = sp.GetRequiredService<SploypeCsvMapper>();
+            archives.Add(new SploypeCsvArchive(basePath, csvMapper));
+
+            // Supabase Storage Archive
+            if (!string.IsNullOrEmpty(supabaseConfig.Url) && 
+                !string.IsNullOrEmpty(supabaseConfig.ApiKey))
+            {
+                var httpClient = new HttpClient();
+                archives.Add(new SupabaseStorageArchive(
+                    httpClient,
+                    supabaseConfig.Url,
+                    supabaseConfig.ApiKey,
+                    iofMapper,
+                    csvMapper));
+            }
+
+            // Create composite archive that writes to all configured archives
+            return new CompositeArchive(archives);
         });
 
         // Register Core Services (Transient - new instance per request)
