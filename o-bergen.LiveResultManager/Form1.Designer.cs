@@ -33,6 +33,7 @@
             lblStatusBadge = new Label();
             lblStatus = new Label();
             grpControls = new GroupBox();
+            btnManageStretches = new Button();
             btnClearLog = new Button();
             btnStop = new Button();
             btnStart = new Button();
@@ -95,15 +96,26 @@
             // 
             // grpControls
             // 
+            grpControls.Controls.Add(btnManageStretches);
             grpControls.Controls.Add(btnClearLog);
             grpControls.Controls.Add(btnStop);
             grpControls.Controls.Add(btnStart);
             grpControls.Location = new Point(12, 88);
             grpControls.Name = "grpControls";
-            grpControls.Size = new Size(470, 70);
+            grpControls.Size = new Size(960, 70);
             grpControls.TabIndex = 1;
             grpControls.TabStop = false;
             grpControls.Text = "Controls";
+            // 
+            // btnManageStretches
+            // 
+            btnManageStretches.Location = new Point(468, 22);
+            btnManageStretches.Name = "btnManageStretches";
+            btnManageStretches.Size = new Size(180, 35);
+            btnManageStretches.TabIndex = 3;
+            btnManageStretches.Text = "Manage Invalid Stretches";
+            btnManageStretches.UseVisualStyleBackColor = true;
+            btnManageStretches.Click += btnManageStretches_Click;
             // 
             // btnClearLog
             // 
@@ -330,6 +342,7 @@
         private Button btnStart;
         private Button btnStop;
         private Button btnClearLog;
+        private Button btnManageStretches;
         private GroupBox grpConfiguration;
         private Label lblAccessDb;
         private TextBox txtAccessDbPath;

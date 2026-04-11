@@ -2,6 +2,7 @@ using o_bergen.LiveResultManager.Application.DTOs;
 using o_bergen.LiveResultManager.Core.Interfaces;
 using o_bergen.LiveResultManager.Core.Models;
 using o_bergen.LiveResultManager.Core.Services;
+using o_bergen.LiveResultManager.UI;
 
 namespace o_bergen.LiveResultManager;
 
@@ -15,17 +16,20 @@ public partial class Form1 : Form
     private readonly ConfigurationDto _configuration;
     private readonly IResultSource _resultSource;
     private readonly IResultDestination _resultDestination;
+    private readonly IInvalidStretchService? _invalidStretchService;
     private readonly TransferStatistics _statistics;
     private System.Threading.Timer? _pollingTimer;
     private bool _isRunning;
     private bool _statusBlinkState;
     private CancellationTokenSource? _cancellationTokenSource;
+    private EventMetadata? _currentEventMetadata;
 
     public Form1(
         ResultTransferService transferService,
         ConfigurationDto configuration,
         IResultSource resultSource,
-        IResultDestination resultDestination)
+        IResultDestination resultDestination,
+        IInvalidStretchService? invalidStretchService = null)
     {
         InitializeComponent();
 
@@ -33,6 +37,7 @@ public partial class Form1 : Form
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _resultSource = resultSource ?? throw new ArgumentNullException(nameof(resultSource));
         _resultDestination = resultDestination ?? throw new ArgumentNullException(nameof(resultDestination));
+        _invalidStretchService = invalidStretchService;
         _statistics = new TransferStatistics();
 
         // Subscribe to transfer service events
@@ -96,6 +101,24 @@ public partial class Form1 : Form
     {
         txtLog.Clear();
         Log("Log cleared.", LogLevel.Info);
+    }
+
+    private void btnManageStretches_Click(object sender, EventArgs e)
+    {
+        if (_invalidStretchService == null)
+        {
+            MessageBox.Show(
+                "Invalid stretch service is not available.",
+                "Feature Unavailable",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        using var form = new InvalidStretchManagementForm(_invalidStretchService, _currentEventMetadata);
+        form.ShowDialog(this);
+
+        Log("Invalid stretch management dialog closed.", LogLevel.Info);
     }
 
     private void btnBrowseDb_Click(object sender, EventArgs e)
