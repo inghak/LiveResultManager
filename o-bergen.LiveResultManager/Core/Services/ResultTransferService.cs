@@ -194,12 +194,49 @@ public class ResultTransferService
                         {
                             var description = _invalidStretchService.GetAdjustmentDescription(result, eventId);
 
-                            // Adjust the time (parse Time string to seconds, adjust, then convert back)
-                            if (!string.IsNullOrEmpty(result.Time) && int.TryParse(result.Time, out int originalSeconds))
+                            // Adjust the time - handle both "1470" (seconds) and "24:30" (MM:SS) formats
+                            if (!string.IsNullOrEmpty(result.Time))
                             {
+                                int originalSeconds;
+                                bool isTimeFormat = result.Time.Contains(':');
+
+                                if (isTimeFormat)
+                                {
+                                    // Parse MM:SS format
+                                    var parts = result.Time.Split(':');
+                                    if (parts.Length == 2 && int.TryParse(parts[0], out int minutes) && int.TryParse(parts[1], out int seconds))
+                                    {
+                                        originalSeconds = minutes * 60 + seconds;
+                                    }
+                                    else
+                                    {
+                                        continue; // Skip if format is invalid
+                                    }
+                                }
+                                else if (int.TryParse(result.Time, out originalSeconds))
+                                {
+                                    // Already in seconds
+                                }
+                                else
+                                {
+                                    continue; // Skip if format is invalid
+                                }
+
                                 int adjustedSeconds = Math.Max(0, originalSeconds - adjustment);
+
+                                // Convert back to original format
+                                if (isTimeFormat)
+                                {
+                                    int adjMinutes = adjustedSeconds / 60;
+                                    int adjSecs = adjustedSeconds % 60;
+                                    result.Time = $"{adjMinutes}:{adjSecs:D2}";
+                                }
+                                else
+                                {
+                                    result.Time = adjustedSeconds.ToString();
+                                }
+
                                 Log($"   ✓ Adjusting {result.FirstName} {result.LastName} (ID: {result.Id}): {originalSeconds}s → {adjustedSeconds}s (-{adjustment}s)", LogLevel.Success);
-                                result.Time = adjustedSeconds.ToString();
 
                                 // Append adjustment info to status message
                                 if (!string.IsNullOrEmpty(description))
