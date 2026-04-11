@@ -169,6 +169,13 @@ public class ResultTransferService
                 if (stretches.Count > 0)
                 {
                     Log($"⚠️ Applying {stretches.Count} invalid stretch adjustment(s)...", LogLevel.Information);
+                    Log($"   Event ID: {eventId}", LogLevel.Information);
+
+                    foreach (var stretch in stretches)
+                    {
+                        Log($"   Stretch: {stretch.FromControlCode} → {stretch.ToControlCode}", LogLevel.Information);
+                    }
+
                     int adjustedCount = 0;
 
                     foreach (var result in results)
@@ -182,6 +189,7 @@ public class ResultTransferService
                             if (!string.IsNullOrEmpty(result.Time) && int.TryParse(result.Time, out int originalSeconds))
                             {
                                 int adjustedSeconds = Math.Max(0, originalSeconds - adjustment);
+                                Log($"   Adjusting {result.FirstName} {result.LastName} (ID: {result.Id}): {originalSeconds}s → {adjustedSeconds}s (-{adjustment}s)", LogLevel.Information);
                                 result.Time = adjustedSeconds.ToString();
 
                                 // Append adjustment info to status message
@@ -200,6 +208,10 @@ public class ResultTransferService
                     if (adjustedCount > 0)
                     {
                         Log($"✅ Adjusted times for {adjustedCount} result(s)", LogLevel.Success);
+                    }
+                    else
+                    {
+                        Log($"⚠️ No results matched the configured stretches", LogLevel.Warning);
                     }
                 }
             }

@@ -202,6 +202,9 @@ public class InvalidStretchService : IInvalidStretchService
         if (splitTimes.Count < 2)
             return 0;
 
+        // Debug: Log split time codes for troubleshooting
+        System.Diagnostics.Debug.WriteLine($"Looking for stretch {control1}→{control2} in: {string.Join(", ", splitTimes.Select(st => st.Code))}");
+
         for (int i = 0; i < splitTimes.Count - 1; i++)
         {
             var current = splitTimes[i];
@@ -213,10 +216,12 @@ public class InvalidStretchService : IInvalidStretchService
             {
                 // Calculate the split time between the two controls
                 // Splittime in next control is the time from previous control to this control
+                System.Diagnostics.Debug.WriteLine($"Found match: {current.Code}→{next.Code}, adjustment: {next.Splittime}s");
                 return next.Splittime;
             }
         }
 
+        System.Diagnostics.Debug.WriteLine($"No match found for stretch {control1}→{control2}");
         return 0;
     }
 }
