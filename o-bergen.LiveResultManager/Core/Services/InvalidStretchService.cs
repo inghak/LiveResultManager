@@ -154,7 +154,8 @@ public class InvalidStretchService : IInvalidStretchService
 
             var json = JsonSerializer.Serialize(configToSave, new JsonSerializerOptions 
             { 
-                WriteIndented = true 
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping // Don't escape Norwegian characters
             });
 
             await File.WriteAllTextAsync(_configFilePath, json);
