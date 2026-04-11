@@ -177,9 +177,18 @@ public class ResultTransferService
                     }
 
                     int adjustedCount = 0;
+                    int checkedCount = 0;
 
                     foreach (var result in results)
                     {
+                        // Log first 3 results' split times for debugging
+                        if (checkedCount < 3 && result.SplitTimes?.Count > 0)
+                        {
+                            var codes = string.Join(", ", result.SplitTimes.Select(st => st.Code));
+                            Log($"   Sample result {result.Id} controls: {codes}", LogLevel.Information);
+                        }
+                        checkedCount++;
+
                         var adjustment = _invalidStretchService.CalculateTimeAdjustment(result, eventId);
                         if (adjustment > 0)
                         {
@@ -189,7 +198,7 @@ public class ResultTransferService
                             if (!string.IsNullOrEmpty(result.Time) && int.TryParse(result.Time, out int originalSeconds))
                             {
                                 int adjustedSeconds = Math.Max(0, originalSeconds - adjustment);
-                                Log($"   Adjusting {result.FirstName} {result.LastName} (ID: {result.Id}): {originalSeconds}s → {adjustedSeconds}s (-{adjustment}s)", LogLevel.Information);
+                                Log($"   ✓ Adjusting {result.FirstName} {result.LastName} (ID: {result.Id}): {originalSeconds}s → {adjustedSeconds}s (-{adjustment}s)", LogLevel.Success);
                                 result.Time = adjustedSeconds.ToString();
 
                                 // Append adjustment info to status message
@@ -211,7 +220,7 @@ public class ResultTransferService
                     }
                     else
                     {
-                        Log($"⚠️ No results matched the configured stretches", LogLevel.Warning);
+                        Log($"⚠️ No results matched the configured stretches (checked {checkedCount} results)", LogLevel.Warning);
                     }
                 }
             }
