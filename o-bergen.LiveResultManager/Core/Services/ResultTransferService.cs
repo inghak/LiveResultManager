@@ -13,6 +13,7 @@ public class ResultTransferService
     private readonly IResultSource _source;
     private readonly IResultDestination _destination;
     private readonly IResultArchive _archive;
+    private readonly IInvalidStretchService? _invalidStretchService;
     private readonly ILogger? _logger;
     private Dictionary<string, RaceResult> _previousResults = new();
 
@@ -35,11 +36,13 @@ public class ResultTransferService
         IResultSource source,
         IResultDestination destination,
         IResultArchive archive,
+        IInvalidStretchService? invalidStretchService = null,
         ILogger? logger = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _destination = destination ?? throw new ArgumentNullException(nameof(destination));
         _archive = archive ?? throw new ArgumentNullException(nameof(archive));
+        _invalidStretchService = invalidStretchService;
         _logger = logger;
     }
 
@@ -157,7 +160,109 @@ public class ResultTransferService
 
             NotifyProgress("Archive complete", 70);
 
-            // Step 4: Write to destination
+            // Step 4: Apply invalid stretch adjustments
+            if (_invalidStretchService != null && metadata.EventMetadata != null)
+            {
+                var eventId = InvalidStretch.CreateEventId(metadata.EventMetadata.Name, metadata.EventMetadata.Date);
+                var stretches = _invalidStretchService.GetStretchesForEvent(eventId);
+
+                if (stretches.Count > 0)
+                {
+                    Log($"⚠️ Applying {stretches.Count} invalid stretch adjustment(s)...", LogLevel.Information);
+                    Log($"   Event ID: {eventId}", LogLevel.Information);
+
+                    foreach (var stretch in stretches)
+                    {
+                        Log($"   Stretch: {stretch.FromControlCode} → {stretch.ToControlCode}", LogLevel.Information);
+                    }
+
+                    int adjustedCount = 0;
+                    int checkedCount = 0;
+
+                    foreach (var result in results)
+                    {
+                        // Log first 3 results' split times for debugging
+                        if (checkedCount < 3 && result.SplitTimes?.Count > 0)
+                        {
+                            var codes = string.Join(", ", result.SplitTimes.Select(st => st.Code));
+                            Log($"   Sample result {result.Id} controls: {codes}", LogLevel.Information);
+                        }
+                        checkedCount++;
+
+                        var adjustment = _invalidStretchService.CalculateTimeAdjustment(result, eventId);
+                        if (adjustment > 0)
+                        {
+                            var description = _invalidStretchService.GetAdjustmentDescription(result, eventId);
+
+                            // Adjust the time - handle both "1470" (seconds) and "24:30" (MM:SS) formats
+                            if (!string.IsNullOrEmpty(result.Time))
+                            {
+                                int originalSeconds;
+                                bool isTimeFormat = result.Time.Contains(':');
+
+                                if (isTimeFormat)
+                                {
+                                    // Parse MM:SS format
+                                    var parts = result.Time.Split(':');
+                                    if (parts.Length == 2 && int.TryParse(parts[0], out int minutes) && int.TryParse(parts[1], out int seconds))
+                                    {
+                                        originalSeconds = minutes * 60 + seconds;
+                                    }
+                                    else
+                                    {
+                                        continue; // Skip if format is invalid
+                                    }
+                                }
+                                else if (int.TryParse(result.Time, out originalSeconds))
+                                {
+                                    // Already in seconds
+                                }
+                                else
+                                {
+                                    continue; // Skip if format is invalid
+                                }
+
+                                int adjustedSeconds = Math.Max(0, originalSeconds - adjustment);
+
+                                // Convert back to original format
+                                if (isTimeFormat)
+                                {
+                                    int adjMinutes = adjustedSeconds / 60;
+                                    int adjSecs = adjustedSeconds % 60;
+                                    result.Time = $"{adjMinutes}:{adjSecs:D2}";
+                                }
+                                else
+                                {
+                                    result.Time = adjustedSeconds.ToString();
+                                }
+
+                                Log($"   ✓ Adjusting {result.FirstName} {result.LastName} (ID: {result.Id}): {originalSeconds}s → {adjustedSeconds}s (-{adjustment}s)", LogLevel.Success);
+
+                                // Append adjustment info to status message
+                                if (!string.IsNullOrEmpty(description))
+                                {
+                                    result.StatusMessage = string.IsNullOrEmpty(result.StatusMessage)
+                                        ? description
+                                        : $"{result.StatusMessage}; {description}";
+                                }
+
+                                adjustedCount++;
+                            }
+                        }
+                    }
+
+                    if (adjustedCount > 0)
+                    {
+                        Log($"✅ Adjusted times for {adjustedCount} result(s)", LogLevel.Success);
+                    }
+                    else
+                    {
+                        Log($"⚠️ No results matched the configured stretches (checked {checkedCount} results)", LogLevel.Warning);
+                    }
+                }
+            }
+
+            // Step 5: Write to destination
             Log("📤 Writing to destination...", LogLevel.Information);
             NotifyProgress("Writing to destination...", 80);
             var written = await _destination.WriteResultsAsync(results, cancellationToken);

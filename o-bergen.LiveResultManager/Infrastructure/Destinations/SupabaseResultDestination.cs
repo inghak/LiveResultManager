@@ -90,12 +90,13 @@ public class SupabaseResultDestination : IResultDestination
 
         try
         {
-            var response = await _client
+            await _client
                 .From<LiveResult>()
                 .OnConflict("id")
                 .Upsert(liveResults);
 
-            return response.Models.Count;
+            // Upsert doesn't always return models in response, so return the count we attempted to write
+            return liveResults.Count;
         }
         catch (Exception ex)
         {

@@ -134,6 +134,16 @@ public static class DependencyInjection
             return new CompositeArchive(archives);
         });
 
+        // Register Invalid Stretch Service (Singleton - manages configuration state)
+        services.AddSingleton<IInvalidStretchService>(sp =>
+        {
+            var basePath = archiveConfig.BasePath;
+            if (string.IsNullOrEmpty(basePath))
+                basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Archive");
+
+            return new InvalidStretchService(basePath);
+        });
+
         // Register Core Services (Transient - new instance per request)
         services.AddTransient<ResultTransferService>();
 
