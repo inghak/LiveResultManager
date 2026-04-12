@@ -49,13 +49,19 @@ Konfigurasjon for lokal arkivering.
 {
   "Archive": {
     "BasePath": "C:\\ResultsArchive",
-    "KeepDays": 90
+    "KeepDays": 90,
+    "SploypeCsvEncoding": "windows-1252"
   }
 }
 ```
 
 - **BasePath**: Rotmappe for arkiv. Understrukturen blir automatisk: `BasePath\yyyy\yyyy-MM-dd\`
 - **KeepDays**: Hvor mange dager arkivet skal beholdes (ikke implementert ennå)
+- **SploypeCsvEncoding**: Encoding for Sploype CSV filer
+  - `"windows-1252"` (default): Legacy encoding for World of O WinSplits (anbefalt for nå)
+  - `"utf-8-bom"`: Modern UTF-8 med BOM (bruk når World of O støtter UTF-8)
+
+  Se [ENCODING-CONFIGURATION.md](../ENCODING-CONFIGURATION.md) for detaljer om encoding-valg.
 
 #### Transfer
 Konfigurasjon for overføringsprosessen.

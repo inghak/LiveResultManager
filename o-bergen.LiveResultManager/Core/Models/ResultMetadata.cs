@@ -41,6 +41,11 @@ public class ResultMetadata
     public int RecordsDeleted { get; set; }
 
     /// <summary>
+    /// Number of records adjusted for invalid stretches
+    /// </summary>
+    public int RecordsAdjustedForInvalidStretch { get; set; }
+
+    /// <summary>
     /// Indicates if the transfer was successful
     /// </summary>
     public bool Success { get; set; }

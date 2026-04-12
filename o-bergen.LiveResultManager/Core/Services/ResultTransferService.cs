@@ -254,6 +254,7 @@ public class ResultTransferService
                     if (adjustedCount > 0)
                     {
                         Log($"✅ Adjusted times for {adjustedCount} result(s)", LogLevel.Success);
+                        metadata.RecordsAdjustedForInvalidStretch = adjustedCount;
                     }
                     else
                     {

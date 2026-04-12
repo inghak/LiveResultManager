@@ -45,6 +45,8 @@
             txtAccessDbPath = new TextBox();
             lblAccessDb = new Label();
             grpStatistics = new GroupBox();
+            lblInvalidStretches = new Label();
+            lblAdjustedStretches = new Label();
             lblLastWritten = new Label();
             lblLastRead = new Label();
             lblSuccessRate = new Label();
@@ -158,7 +160,7 @@
             grpConfiguration.Controls.Add(lblAccessDb);
             grpConfiguration.Location = new Point(12, 194);
             grpConfiguration.Name = "grpConfiguration";
-            grpConfiguration.Size = new Size(470, 130);
+            grpConfiguration.Size = new Size(470, 150);
             grpConfiguration.TabIndex = 2;
             grpConfiguration.TabStop = false;
             grpConfiguration.Text = "Configuration";
@@ -219,6 +221,8 @@
             // 
             // grpStatistics
             // 
+            grpStatistics.Controls.Add(lblInvalidStretches);
+            grpStatistics.Controls.Add(lblAdjustedStretches);
             grpStatistics.Controls.Add(lblLastWritten);
             grpStatistics.Controls.Add(lblLastRead);
             grpStatistics.Controls.Add(lblSuccessRate);
@@ -239,6 +243,26 @@
             lblLastWritten.Size = new Size(120, 15);
             lblLastWritten.TabIndex = 4;
             lblLastWritten.Text = "Last written: 0 records";
+            // 
+            // lblAdjustedStretches
+            // 
+            lblAdjustedStretches.AutoSize = true;
+            lblAdjustedStretches.Location = new Point(6, 149);
+            lblAdjustedStretches.Name = "lblAdjustedStretches";
+            lblAdjustedStretches.Size = new Size(220, 15);
+            lblAdjustedStretches.TabIndex = 5;
+            lblAdjustedStretches.Text = "Adjusted for invalid stretches: 0 results";
+            lblAdjustedStretches.ForeColor = Color.Gray;
+            // 
+            // lblInvalidStretches
+            // 
+            lblInvalidStretches.AutoSize = true;
+            lblInvalidStretches.Location = new Point(6, 175);
+            lblInvalidStretches.Name = "lblInvalidStretches";
+            lblInvalidStretches.Size = new Size(200, 15);
+            lblInvalidStretches.TabIndex = 6;
+            lblInvalidStretches.Text = "Invalid stretches: None configured";
+            lblInvalidStretches.ForeColor = Color.Gray;
             // 
             // lblLastRead
             // 
@@ -279,9 +303,9 @@
             // grpLog
             // 
             grpLog.Controls.Add(txtLog);
-            grpLog.Location = new Point(12, 300);
+            grpLog.Location = new Point(12, 350);
             grpLog.Name = "grpLog";
-            grpLog.Size = new Size(960, 338);
+            grpLog.Size = new Size(960, 288);
             grpLog.TabIndex = 4;
             grpLog.TabStop = false;
             grpLog.Text = "Log";
@@ -295,7 +319,7 @@
             txtLog.Name = "txtLog";
             txtLog.ReadOnly = true;
             txtLog.ScrollBars = ScrollBars.Vertical;
-            txtLog.Size = new Size(948, 310);
+            txtLog.Size = new Size(948, 260);
             txtLog.TabIndex = 0;
             // 
             // timerStatusBlink
@@ -356,6 +380,8 @@
         private Label lblSuccessRate;
         private Label lblLastRead;
         private Label lblLastWritten;
+        private Label lblAdjustedStretches;
+        private Label lblInvalidStretches;
         private GroupBox grpLog;
         private TextBox txtLog;
         private System.Windows.Forms.Timer timerStatusBlink;

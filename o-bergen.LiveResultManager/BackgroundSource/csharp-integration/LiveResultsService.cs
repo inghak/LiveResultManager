@@ -206,6 +206,7 @@ namespace OBergen.LiveResults
                 Ecard2 = emit.Ecard2,
                 FirstName = emit.FirstName,
                 LastName = emit.LastName,
+                StartTime = emit.StartTime,
                 Class = emit.Class,
                 Course = emit.Course,
                 TimeSeconds = emit.TimeSeconds,

@@ -103,7 +103,7 @@ namespace WorkerServiceApp.Services
                 await connection.OpenAsync();
                 var dayAsString = day.ToString().Trim();
                 _logger.LogInformation("Fetching results for day: {day}", day);
-                using (var command = new OdbcCommand($"select n.id, n.ecard, n.ecard2, n.ename, n.name, n.times, n.status, n.statusmsg, n.class, n.cource, n.points, n.team, t.name as teamname from Name n, Team t where n.team=t.code and n.status in ('A','D','B','S')", connection))
+                using (var command = new OdbcCommand($"select n.id, n.ecard, n.ecard2, n.ename, n.name, n.start, n.times, n.status, n.statusmsg, n.class, n.cource, n.points, n.team, t.name as teamname from Name n, Team t where n.team=t.code and n.status in ('A','D','B','S')", connection))
                 {
                     using (var reader = await command.ExecuteReaderAsync())
                     {
@@ -116,6 +116,7 @@ namespace WorkerServiceApp.Services
                                 ECard2 = reader["ecard2"].ToString().Trim(),
                                 FirstName = reader["ename"].ToString().Trim(),
                                 LastName = reader["name"].ToString().Trim(),
+                                StartTime = reader["start"].ToString().Trim(),
                                 Time = reader["times"].ToString().Trim(),
                                 Status = reader["status"].ToString().Trim(),
                                 StatusMessage = reader["statusmsg"].ToString().Trim(),
@@ -460,6 +461,7 @@ namespace WorkerServiceApp.Services
             public string ECard2 { get; set; }
             public string FirstName { get; set; }
             public string LastName { get; set; }
+            public string StartTime { get; set; }
             public string Time { get; set; }
             public string Status { get; set; }
             public string StatusMessage { get; set; }

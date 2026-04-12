@@ -115,7 +115,7 @@ public static class DependencyInjection
 
             // Sploype CSV Archive
             var csvMapper = sp.GetRequiredService<SploypeCsvMapper>();
-            archives.Add(new SploypeCsvArchive(basePath, csvMapper));
+            archives.Add(new SploypeCsvArchive(basePath, csvMapper, archiveConfig));
 
             // Supabase Storage Archive
             if (!string.IsNullOrEmpty(supabaseConfig.Url) && 
@@ -127,7 +127,8 @@ public static class DependencyInjection
                     supabaseConfig.Url,
                     supabaseConfig.ApiKey,
                     iofMapper,
-                    csvMapper));
+                    csvMapper,
+                    archiveConfig));
             }
 
             // Create composite archive that writes to all configured archives

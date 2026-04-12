@@ -25,6 +25,9 @@ namespace OBergen.LiveResults
         [JsonProperty("lastName")]
         public string LastName { get; set; } = string.Empty;
 
+        [JsonProperty("startTime")]
+        public string? StartTime { get; set; }
+
         [JsonProperty("class")]
         public string Class { get; set; } = string.Empty;
 

@@ -14,6 +14,8 @@ public class EventMetadata
     public string EventType { get; set; } = "Normal";
     public string TerrainType { get; set; } = "Skog";
     public int Day { get; set; } = -1;
+    public DateTime? StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
 }
 
 /// <summary>

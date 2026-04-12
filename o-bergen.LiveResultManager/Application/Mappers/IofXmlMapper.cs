@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using o_bergen.LiveResultManager.Core.Models;
+using LiveResultManager.Core.Enums;
 
 namespace o_bergen.LiveResultManager.Application.Mappers;
 
@@ -75,12 +76,29 @@ public class IofXmlMapper
             // Name
             eventElement.Add(new XElement(_ns + "Name", eventMetadata.Name ?? "Bedriftsløp"));
 
-            // Start and End times - estimate from date only since we don't have times
-            if (!string.IsNullOrEmpty(eventMetadata.Date))
+            // Start and End times - use full datetime if available from database
+            if (eventMetadata.StartTime.HasValue)
             {
+                // Create StartTime with both Date and Time elements
+                var startTimeElement = new XElement(_ns + "StartTime",
+                    new XElement(_ns + "Date", eventMetadata.StartTime.Value.ToString("yyyy-MM-dd")),
+                    new XElement(_ns + "Time", FormatTime(eventMetadata.StartTime.Value))
+                );
+                eventElement.Add(startTimeElement);
+
+                // Create EndTime with both Date and Time elements
+                var endTime = eventMetadata.EndTime ?? eventMetadata.StartTime.Value;
+                var endTimeElement = new XElement(_ns + "EndTime",
+                    new XElement(_ns + "Date", endTime.ToString("yyyy-MM-dd")),
+                    new XElement(_ns + "Time", FormatTime(endTime))
+                );
+                eventElement.Add(endTimeElement);
+            }
+            else if (!string.IsNullOrEmpty(eventMetadata.Date))
+            {
+                // Fallback: date-only if StartTime not available
                 if (DateTime.TryParse(eventMetadata.Date, out var eventDate))
                 {
-                    // Create basic date-only elements (no time since we don't have it in metadata)
                     eventElement.Add(new XElement(_ns + "StartTime",
                         new XElement(_ns + "Date", eventDate.ToString("yyyy-MM-dd"))
                     ));
@@ -112,12 +130,24 @@ public class IofXmlMapper
             new XElement(_ns + "Name", className)
         ));
 
-        // Course element (take from first result if available)
+        // Course element (lookup from metadata by course code/level)
         var firstResult = results.FirstOrDefault();
         if (firstResult != null && !string.IsNullOrEmpty(firstResult.Course))
         {
-            if (int.TryParse(firstResult.Course, out var courseLength))
+            // Try to find course in metadata by matching Level (course code)
+            var course = metadata.EventMetadata?.Courses
+                .FirstOrDefault(c => c.Level == firstResult.Course);
+
+            if (course != null && course.Length > 0)
             {
+                // Use course length from metadata
+                classResult.Add(new XElement(_ns + "Course",
+                    new XElement(_ns + "Length", (int)course.Length)
+                ));
+            }
+            else if (int.TryParse(firstResult.Course, out var courseLength) && courseLength > 10)
+            {
+                // Fallback: if Course field is actually a length (> 10 to avoid course codes)
                 classResult.Add(new XElement(_ns + "Course",
                     new XElement(_ns + "Length", courseLength)
                 ));
@@ -216,24 +246,33 @@ public class IofXmlMapper
             resultElement.Add(new XElement(_ns + "BibNumber", "0"));
         }
 
-        // Start and Finish times (estimate from event metadata if available)
-        // Note: We don't have actual start times per person, so we estimate
-        if (metadata.EventMetadata != null && !string.IsNullOrEmpty(metadata.EventMetadata.Date))
+        // Start and Finish times (use event start time or individual start time)
+        DateTime? actualStartTime = null;
+
+        // First, try to use the event's actual StartTime from metadata
+        if (metadata.EventMetadata?.StartTime.HasValue == true)
+        {
+            actualStartTime = metadata.EventMetadata.StartTime.Value;
+        }
+        // Fallback: parse from date string with default time
+        else if (metadata.EventMetadata != null && !string.IsNullOrEmpty(metadata.EventMetadata.Date))
         {
             if (DateTime.TryParse(metadata.EventMetadata.Date, out var eventDate))
             {
-                // Use a default start time (e.g., 17:00) since we don't have it in metadata
-                var startTime = eventDate.Date.AddHours(17);
+                actualStartTime = eventDate.Date.AddHours(17); // Default 17:00
+            }
+        }
 
-                resultElement.Add(new XElement(_ns + "StartTime", FormatDateTime(startTime)));
+        if (actualStartTime.HasValue)
+        {
+            resultElement.Add(new XElement(_ns + "StartTime", FormatDateTime(actualStartTime.Value)));
 
-                // Calculate finish time
-                var timeSeconds = ParseTimeToSeconds(result.Time);
-                if (timeSeconds > 0)
-                {
-                    var finishTime = startTime.AddSeconds(timeSeconds);
-                    resultElement.Add(new XElement(_ns + "FinishTime", FormatDateTime(finishTime)));
-                }
+            // Calculate finish time from result time
+            var timeSeconds = ParseTimeToSeconds(result.Time);
+            if (timeSeconds > 0)
+            {
+                var finishTime = actualStartTime.Value.AddSeconds(timeSeconds);
+                resultElement.Add(new XElement(_ns + "FinishTime", FormatDateTime(finishTime)));
             }
         }
 
@@ -259,11 +298,23 @@ public class IofXmlMapper
         // Status
         resultElement.Add(new XElement(_ns + "Status", MapStatus(result.Status)));
 
-        // Course (if specific to this result)
+        // Course (lookup from metadata by course code/level)
         if (!string.IsNullOrEmpty(result.Course))
         {
-            if (int.TryParse(result.Course, out var courseLength))
+            // Try to find course in metadata by matching Level (course code)
+            var course = metadata.EventMetadata?.Courses
+                .FirstOrDefault(c => c.Level == result.Course);
+
+            if (course != null && course.Length > 0)
             {
+                // Use course length from metadata
+                resultElement.Add(new XElement(_ns + "Course",
+                    new XElement(_ns + "Length", (int)course.Length)
+                ));
+            }
+            else if (int.TryParse(result.Course, out var courseLength) && courseLength > 10)
+            {
+                // Fallback: if Course field is actually a length (> 10 to avoid course codes)
                 resultElement.Add(new XElement(_ns + "Course",
                     new XElement(_ns + "Length", courseLength)
                 ));
@@ -326,37 +377,24 @@ public class IofXmlMapper
 
     private bool IsOkStatus(string? status)
     {
-        if (string.IsNullOrWhiteSpace(status))
-            return false;
-
-        var normalized = status.Trim().ToUpperInvariant();
-        return normalized == "OK" || normalized == "FINISHED";
+        return StatusMapper.IsOkStatus(status);
     }
 
     private string MapStatus(string? status)
     {
-        if (string.IsNullOrWhiteSpace(status))
-            return "DidNotStart";
-
-        var normalized = status.Trim().ToUpperInvariant();
-
-        return normalized switch
-        {
-            "OK" => "OK",
-            "FINISHED" => "OK",
-            "DISQUALIFIED" => "Disqualified",
-            "MISPUNCH" => "MissingPunch",
-            "DNF" => "DidNotFinish",
-            "DNS" => "DidNotStart",
-            "OVERTIME" => "OverTime",
-            "NC" => "NotCompeting",
-            _ => "DidNotStart"
-        };
+        var competitorStatus = StatusMapper.ParseStatus(status);
+        return StatusMapper.ToIofXmlString(competitorStatus);
     }
 
     private string FormatDateTime(DateTime dateTime)
     {
         // ISO 8601 format with timezone
         return dateTime.ToString("yyyy-MM-ddTHH:mm:sszzz");
+    }
+
+    private string FormatTime(DateTime dateTime)
+    {
+        // IOF XML Time format: HH:mm:ss+TZ (e.g., 17:00:00+02:00)
+        return dateTime.ToString("HH:mm:sszzz");
     }
 }

@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,10 @@ internal static class Program
     [STAThread]
     static void Main()
     {
+        // Register encoding provider for Windows-1252 and other code pages
+        // Required for WinSplits/World of O compatibility
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
         // To customize application configuration such as set high DPI settings or default font,
         // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();

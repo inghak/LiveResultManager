@@ -10,6 +10,7 @@ public class TransferStatistics
     private int _totalRecordsTransferred;
     private int _lastReadCount;
     private int _lastWrittenCount;
+    private int _adjustedForInvalidStretchCount;
 
     /// <summary>
     /// Number of successful transfers
@@ -35,6 +36,11 @@ public class TransferStatistics
     /// Number of records written in last operation
     /// </summary>
     public int LastWrittenCount => _lastWrittenCount;
+
+    /// <summary>
+    /// Number of results adjusted for invalid stretches in last operation
+    /// </summary>
+    public int AdjustedForInvalidStretchCount => _adjustedForInvalidStretchCount;
 
     /// <summary>
     /// Success rate as a percentage (0-100)
@@ -88,6 +94,14 @@ public class TransferStatistics
     }
 
     /// <summary>
+    /// Records results adjusted for invalid stretches
+    /// </summary>
+    public void RecordAdjustedForInvalidStretch(int count)
+    {
+        _adjustedForInvalidStretchCount = count;
+    }
+
+    /// <summary>
     /// Resets all statistics
     /// </summary>
     public void Reset()
@@ -97,6 +111,7 @@ public class TransferStatistics
         _totalRecordsTransferred = 0;
         _lastReadCount = 0;
         _lastWrittenCount = 0;
+        _adjustedForInvalidStretchCount = 0;
         LastTransferTime = null;
     }
 }

@@ -10,6 +10,7 @@ public class RaceResult
     public string? ECard2 { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    public string? StartTime { get; set; }
     public string? Time { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? StatusMessage { get; set; }

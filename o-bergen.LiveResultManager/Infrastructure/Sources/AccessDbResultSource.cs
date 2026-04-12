@@ -55,12 +55,14 @@ public class AccessDbResultSource : IResultSource
                 metadata.Organizer = GetString(reader, "Organizator");
                 metadata.Location = arrPlace;
 
-                // Parse date
+                // Parse date and time from firststart
                 if (DateTime.TryParseExact(arrDate, "dd.MM.yyyy HH:mm:ss", null, 
                     System.Globalization.DateTimeStyles.None, out var datetime))
                 {
                     metadata.Year = datetime.Year.ToString();
                     metadata.Date = datetime.ToString("yyyy-MM-dd");
+                    metadata.StartTime = datetime;
+                    metadata.EndTime = datetime; // Same as start for now; could be calculated if needed
                 }
                 else
                 {
@@ -182,6 +184,8 @@ public class AccessDbResultSource : IResultSource
         var results = new List<RaceResult>();
 
         // Query matches the BackgroundSource SQL
+        // Filter by eTiming status codes: A=OK, B=DidNotFinish(brutt), D=Disqualified, S=Unknown(i skogen)
+        // Note: C=DidNotStart is excluded as those competitors never started
         var query = @"
             SELECT 
                 n.id, 
@@ -189,6 +193,7 @@ public class AccessDbResultSource : IResultSource
                 n.ecard2, 
                 n.ename, 
                 n.name, 
+                n.starttime, 
                 n.times, 
                 n.status, 
                 n.statusmsg, 
@@ -199,7 +204,7 @@ public class AccessDbResultSource : IResultSource
                 t.name as teamname 
             FROM Name n 
             LEFT JOIN Team t ON n.team = t.code
-            WHERE n.status IN ('A','D','B','S','OK')";
+            WHERE n.status IN ('A','D','B','S')";
 
         using var command = new OdbcCommand(query, connection);
         using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -211,8 +216,9 @@ public class AccessDbResultSource : IResultSource
                 Id = GetString(reader, "id"),
                 ECard = GetString(reader, "ecard"),
                 ECard2 = GetStringOrNull(reader, "ecard2"),
-                FirstName = GetString(reader, "ename"),
-                LastName = GetString(reader, "name"),
+                FirstName = GetString(reader, "name"),      // name = given name (fornavn)
+                LastName = GetString(reader, "ename"),      // ename = family name (etternavn)
+                StartTime = ConvertStartTimeToHHMM(reader, "starttime"),
                 Time = GetString(reader, "times"),
                 Status = GetString(reader, "status"),
                 StatusMessage = GetStringOrNull(reader, "statusmsg"),
@@ -355,5 +361,36 @@ public class AccessDbResultSource : IResultSource
             string str when double.TryParse(str, out var result) => result,
             _ => 0
         };
+    }
+
+    private static string? ConvertStartTimeToHHMM(DbDataReader reader, string columnName)
+    {
+        var ordinal = reader.GetOrdinal(columnName);
+        if (reader.IsDBNull(ordinal))
+            return null;
+
+        var value = reader.GetValue(ordinal);
+
+        // Handle fraction of a day (Access Database datetime format)
+        double fractionOfDay = value switch
+        {
+            double d => d,
+            float f => f,
+            decimal dec => (double)dec,
+            string str when double.TryParse(str, System.Globalization.NumberStyles.Float, 
+                System.Globalization.CultureInfo.InvariantCulture, out var result) => result,
+            _ => -1
+        };
+
+        if (fractionOfDay >= 0 && fractionOfDay < 1)
+        {
+            // Convert fraction of day to hours and minutes
+            var totalMinutes = (int)(fractionOfDay * 24 * 60);
+            var hours = totalMinutes / 60;
+            var minutes = totalMinutes % 60;
+            return $"{hours:D2}:{minutes:D2}";
+        }
+
+        return null;
     }
 }

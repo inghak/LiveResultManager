@@ -39,6 +39,12 @@ public record ArchiveConfig
 {
     public string BasePath { get; init; } = string.Empty;
     public int KeepDays { get; init; } = 90;
+
+    /// <summary>
+    /// Encoding for Sploype CSV files: "windows-1252" (legacy WinSplits) or "utf-8-bom" (modern)
+    /// Default: "windows-1252" for compatibility with World of O WinSplits
+    /// </summary>
+    public string SploypeCsvEncoding { get; init; } = "windows-1252";
 }
 
 /// <summary>

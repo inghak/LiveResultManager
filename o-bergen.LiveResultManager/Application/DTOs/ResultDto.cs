@@ -11,6 +11,7 @@ public record ResultDto
     public string? ECard2 { get; init; }
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
+    public string? StartTime { get; init; }
     public string? Time { get; init; }
     public string? Status { get; init; }
     public string? StatusMessage { get; init; }

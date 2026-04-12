@@ -55,6 +55,9 @@ public partial class Form1 : Form
         // Test connections on startup
         _ = TestConnectionsAsync();
 
+        // Load event metadata and invalid stretches
+        _ = LoadEventMetadataAsync();
+
         Log("Application started. Ready to transfer results.", LogLevel.Info);
         Log($"Source: {_resultSource.SourceName}", LogLevel.Info);
         Log($"Destination: {_resultDestination.DestinationName}", LogLevel.Info);
@@ -124,6 +127,9 @@ public partial class Form1 : Form
         using var form = new InvalidStretchManagementForm(_invalidStretchService, _currentEventMetadata);
         form.ShowDialog(this);
 
+        // Refresh invalid stretches display after dialog closes
+        UpdateInvalidStretchesDisplay();
+
         Log("Invalid stretch management dialog closed.", LogLevel.Info);
     }
 
@@ -188,6 +194,12 @@ public partial class Form1 : Form
                 _statistics.RecordRead(metadata.RecordsRead);
                 _statistics.RecordWritten(metadata.RecordsWritten);
                 _statistics.RecordSuccess(metadata.RecordsWritten);
+
+                // Record invalid stretch adjustments if any
+                if (metadata.RecordsAdjustedForInvalidStretch > 0)
+                {
+                    _statistics.RecordAdjustedForInvalidStretch(metadata.RecordsAdjustedForInvalidStretch);
+                }
             }
             else
             {
@@ -220,6 +232,9 @@ public partial class Form1 : Form
             {
                 _currentEventMetadata = await accessDbSource.FetchMetadataAsync(CancellationToken.None);
                 Log($"Event metadata loaded: {_currentEventMetadata.Name} on {_currentEventMetadata.Date:yyyy-MM-dd}", LogLevel.Success);
+
+                // Load and display invalid stretches for this event
+                UpdateInvalidStretchesDisplay();
             }
             else
             {
@@ -324,6 +339,45 @@ public partial class Form1 : Form
         lblSuccessRate.Text = $"Success Rate: {_statistics.SuccessRate:F1}%";
         lblLastRead.Text = $"Last read: {_statistics.LastReadCount} records";
         lblLastWritten.Text = $"Last written: {_statistics.LastWrittenCount} records";
+
+        // Update invalid stretch adjustments if any
+        if (_statistics.AdjustedForInvalidStretchCount > 0)
+        {
+            lblAdjustedStretches.Text = $"Adjusted for invalid stretches: {_statistics.AdjustedForInvalidStretchCount} results";
+            lblAdjustedStretches.ForeColor = Color.DarkOrange;
+        }
+        else
+        {
+            lblAdjustedStretches.Text = "Adjusted for invalid stretches: 0 results";
+            lblAdjustedStretches.ForeColor = Color.Gray;
+        }
+    }
+
+    private void UpdateInvalidStretchesDisplay()
+    {
+        if (_invalidStretchService == null || _currentEventMetadata == null)
+        {
+            lblInvalidStretches.Text = "Invalid stretches: None configured";
+            lblInvalidStretches.ForeColor = Color.Gray;
+            return;
+        }
+
+        var eventId = $"{_currentEventMetadata.Name}_{_currentEventMetadata.Date:yyyy-MM-dd}";
+        var stretches = _invalidStretchService.GetStretchesForEvent(eventId);
+
+        if (stretches.Count == 0)
+        {
+            lblInvalidStretches.Text = "Invalid stretches: None configured";
+            lblInvalidStretches.ForeColor = Color.Gray;
+        }
+        else
+        {
+            var stretchList = string.Join(", ", stretches.Select(s => $"{s.FromControlCode}↔{s.ToControlCode}"));
+            lblInvalidStretches.Text = $"Invalid stretches: {stretchList}";
+            lblInvalidStretches.ForeColor = Color.DarkRed;
+
+            Log($"Active invalid stretches: {stretchList}", LogLevel.Info);
+        }
     }
 
     private void Log(string message, LogLevel level)
