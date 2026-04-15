@@ -263,6 +263,17 @@ public class ResultTransferService
                 }
             }
 
+            // Step 4.5: Calculate ranking points per class (after invalid stretch adjustments)
+            if (results.Count > 0)
+            {
+                Log("📊 Calculating ranking points per class...", LogLevel.Information);
+                var pointsCalculated = CalculateRankingPoints(results);
+                if (pointsCalculated > 0)
+                {
+                    Log($"✅ Calculated ranking points for {pointsCalculated} competitor(s)", LogLevel.Success);
+                }
+            }
+
             // Step 5: Write to destination
             Log("📤 Writing to destination...", LogLevel.Information);
             NotifyProgress("Writing to destination...", 80);
@@ -335,6 +346,84 @@ public class ResultTransferService
     public async Task<DateTime?> GetSourceLastModifiedAsync(CancellationToken cancellationToken = default)
     {
         return await _source.GetLastModifiedAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Calculate ranking points per class using formula: points = (winner_time / competitor_time) * 1000
+    /// Uses the adjusted time (after invalid stretch adjustments)
+    /// Only calculates points for competitors with OK status ('A')
+    /// </summary>
+    /// <returns>Number of competitors that got ranking points calculated</returns>
+    private int CalculateRankingPoints(IReadOnlyList<RaceResult> results)
+    {
+        int totalCalculated = 0;
+
+        // Group results by class
+        var resultsByClass = results
+            .Where(r => !string.IsNullOrWhiteSpace(r.Class))
+            .GroupBy(r => r.Class);
+
+        foreach (var classGroup in resultsByClass)
+        {
+            // Get all competitors with OK status ('A') and valid times
+            var validResults = classGroup
+                .Where(r => r.Status == "A" && !string.IsNullOrWhiteSpace(r.Time))
+                .Select(r => new
+                {
+                    Result = r,
+                    TimeInSeconds = ParseTimeToSeconds(r.Time)
+                })
+                .Where(x => x.TimeInSeconds > 0)
+                .ToList();
+
+            if (validResults.Count == 0)
+            {
+                // Set empty points for all in this class
+                foreach (var result in classGroup)
+                {
+                    result.Points = string.Empty;
+                }
+                continue;
+            }
+
+            // Find winner time (minimum time)
+            var winnerTimeInSeconds = validResults.Min(x => x.TimeInSeconds);
+
+            // Calculate points for each competitor with OK status
+            foreach (var item in validResults)
+            {
+                var points = (double)winnerTimeInSeconds / item.TimeInSeconds * 1000;
+                item.Result.Points = ((int)Math.Round(points)).ToString();
+                totalCalculated++;
+            }
+
+            // Set points to empty string for competitors who did not finish with OK status
+            foreach (var result in classGroup.Where(r => r.Status != "A"))
+            {
+                result.Points = string.Empty;
+            }
+        }
+
+        return totalCalculated;
+    }
+
+    /// <summary>
+    /// Parse time string to seconds. Supports formats: "mm:ss", "hh:mm:ss", or integer seconds
+    /// </summary>
+    private int ParseTimeToSeconds(string? timeString)
+    {
+        if (string.IsNullOrWhiteSpace(timeString))
+            return 0;
+
+        // Try parse as integer (seconds)
+        if (int.TryParse(timeString, out var seconds))
+            return seconds;
+
+        // Try parse as time format (mm:ss or hh:mm:ss)
+        if (TimeSpan.TryParse(timeString, out var timeSpan))
+            return (int)timeSpan.TotalSeconds;
+
+        return 0;
     }
 
     private async Task UpdateArchivedMetadataAsync(

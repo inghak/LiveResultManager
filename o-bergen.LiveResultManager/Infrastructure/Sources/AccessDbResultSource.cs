@@ -129,11 +129,14 @@ public class AccessDbResultSource : IResultSource
         using var connection = new OdbcConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
 
+        // Get metadata to access course definitions
+        var metadata = await FetchMetadataAsync(cancellationToken);
+
         // Read basic results
         results = await ReadBasicResultsAsync(connection, cancellationToken);
 
         // Add split times to results
-        await AddSplitTimesToResultsAsync(connection, results, cancellationToken);
+        await AddSplitTimesToResultsAsync(connection, results, metadata.Courses, cancellationToken);
 
         return results;
     }
@@ -235,11 +238,53 @@ public class AccessDbResultSource : IResultSource
         return results;
     }
 
+    private async Task<Dictionary<string, string>> ReadJokerMappingsAsync(
+        OdbcConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var jokerMap = new Dictionary<string, string>();
+
+        try
+        {
+            var query = "SELECT joker, replace FROM joker";
+            using var command = new OdbcCommand(query, connection);
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var jokerCode = GetString(reader, "joker");
+                var replaceCode = GetString(reader, "replace");
+
+                if (!string.IsNullOrEmpty(jokerCode) && !string.IsNullOrEmpty(replaceCode))
+                {
+                    // Map physical code (replace) to course code (joker)
+                    // Example: 69 -> 53 means when we see 69 in ecard, treat it as 53
+                    jokerMap[replaceCode] = jokerCode;
+                }
+            }
+        }
+        catch
+        {
+            // If joker table doesn't exist or query fails, return empty map
+        }
+
+        return jokerMap;
+    }
+
     private async Task AddSplitTimesToResultsAsync(
         OdbcConnection connection,
         List<RaceResult> results,
+        List<Course> courses,
         CancellationToken cancellationToken)
     {
+        // Read joker mappings first (maps physical code -> course code)
+        var jokerMap = await ReadJokerMappingsAsync(connection, cancellationToken);
+
+        // Build a dictionary of course code -> set of control codes for quick lookup
+        var courseControlCodes = courses.ToDictionary(
+            c => c.Level,
+            c => new HashSet<string>(c.Controls.Select(ctrl => ctrl.Code)));
+
         // Read all split times into memory (more efficient than per-result queries)
         var splitsByECard = new Dictionary<int, List<SplitTime>>();
 
@@ -251,10 +296,12 @@ public class AccessDbResultSource : IResultSource
         {
             var ecardNo = GetInt(reader, "ecardno");
             var number = GetInt(reader, "nr");
+            var controlCode = GetString(reader, "control");
+
             var split = new SplitTime
             {
                 Number = number,
-                Code = GetString(reader, "control"),
+                Code = controlCode,
                 Totaltime = GetInt(reader, "times"),
                 Splittime = -1 // Will be calculated later
             };
@@ -275,8 +322,41 @@ public class AccessDbResultSource : IResultSource
 
             if (ecardNo > 0 && splitsByECard.TryGetValue(ecardNo, out var splits))
             {
+                // Get the control codes for this result's course
+                var courseCode = result.Course;
+                HashSet<string>? controlCodesForCourse = null;
+                if (!string.IsNullOrEmpty(courseCode))
+                {
+                    courseControlCodes.TryGetValue(courseCode, out controlCodesForCourse);
+                }
+
+                // Apply course-aware joker mapping
+                var mappedSplits = splits.Select(s =>
+                {
+                    var code = s.Code;
+                    // Only apply joker mapping if:
+                    // 1. The physical code (s.Code) has a joker mapping
+                    // 2. The course controls exist and contain the joker code
+                    // 3. The course controls do NOT contain the physical code
+                    if (jokerMap.TryGetValue(code, out var jokerCode) && 
+                        controlCodesForCourse != null &&
+                        controlCodesForCourse.Contains(jokerCode) &&
+                        !controlCodesForCourse.Contains(code))
+                    {
+                        code = jokerCode;
+                    }
+
+                    return new SplitTime
+                    {
+                        Number = s.Number,
+                        Code = code,
+                        Totaltime = s.Totaltime,
+                        Splittime = s.Splittime
+                    };
+                }).ToList();
+
                 // Sort by number and remove control 250 (finish)
-                var sortedSplits = splits
+                var sortedSplits = mappedSplits
                     .Where(s => s.Code != "250")
                     .OrderBy(s => s.Number)
                     .ToList();

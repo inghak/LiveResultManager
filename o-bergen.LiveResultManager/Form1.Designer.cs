@@ -338,6 +338,7 @@
             Controls.Add(grpControls);
             Controls.Add(grpStatus);
             FormBorderStyle = FormBorderStyle.FixedSingle;
+            Icon = new Icon("Resources\\app-icon.ico");
             MaximizeBox = false;
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
