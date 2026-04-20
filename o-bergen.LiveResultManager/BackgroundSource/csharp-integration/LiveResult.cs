@@ -9,6 +9,7 @@ namespace OBergen.LiveResults
     /// <summary>
     /// Datamodell for live_results tabell i Supabase
     /// Matcher TypeScript interface LiveResult
+    /// IMPORTANT: Composite primary key (id, competition_date) to separate different races
     /// </summary>
     [Table("live_results")]
     public class LiveResult : BaseModel
@@ -17,6 +18,7 @@ namespace OBergen.LiveResults
         [JsonProperty("id")]
         public string Id { get; set; } = string.Empty;
 
+        [PrimaryKey("competition_date", false)]
         [Column("competition_date")]
         [JsonProperty("competition_date")]
         public string CompetitionDate { get; set; } = string.Empty;

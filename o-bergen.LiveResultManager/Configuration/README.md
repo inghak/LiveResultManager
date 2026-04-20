@@ -233,28 +233,85 @@ Antall slettede records blir lagret i metadata:
 
 ## Unique Key & Upsert Behavior
 
-Systemet bruker **Id** som primærnøkkel for Supabase upsert:
+Systemet bruker **composite key** (`id` + `competition_date`) som primærnøkkel for Supabase upsert:
 
 ### Hvordan det fungerer
 
-1. **Nøkkel**: `id` fra Access-databasen (unikt per deltaker)
-2. **Upsert**: Hvis `id` allerede finnes i Supabase, oppdateres raden
-3. **Insert**: Hvis `id` er ny, legges en ny rad til
+1. **Composite Nøkkel**: `id` + `competition_date` (unikt per deltaker per løp)
+2. **Upsert**: Hvis kombinasjonen `(id, competition_date)` allerede finnes, oppdateres raden
+3. **Insert**: Hvis kombinasjonen er ny, legges en ny rad til
 
-### Eksempel scenario
+⚠️ **KRITISK**: Uten `competition_date` i nøkkelen vil forskjellige løp overskrive hverandres resultater!
 
-**Scenario**: En løper med ID "9870" endrer status fra "Startet" til "OK"
+### Eksempel scenario - Innen samme løp
+
+**Scenario**: En løper med ID "9870" endrer status fra "Startet" til "OK" i løp 2026-04-08
 
 ```
-Transfer 1: id=9870, Status=S, Time="" → Supabase (INSERT)
-Transfer 2: id=9870, Status=OK, Time="45:23" → Supabase (UPDATE)
+Transfer 1: id=9870, competition_date=2026-04-08, Status=S, Time="" → Supabase (INSERT)
+Transfer 2: id=9870, competition_date=2026-04-08, Status=OK, Time="45:23" → Supabase (UPDATE)
 ```
 
-**Resultat**: Samme rad i Supabase oppdateres med ny status og tid.
+**Resultat**: Samme rad oppdateres med ny status og tid.
+
+### Eksempel scenario - Forskjellige løp
+
+**Scenario**: Samme løper (ID "9870") deltar i to forskjellige løp
+
+```
+Løp 1: id=9870, competition_date=2026-04-08 → Supabase (INSERT rad 1)
+Løp 2: id=9870, competition_date=2026-04-15 → Supabase (INSERT rad 2)
+```
+
+**Resultat**: To separate rader i Supabase, ett resultat per løp.
 
 ### Viktig
 
-- 🔑 **Primærnøkkel**: `id` (fra Access DB)
+- 🔑 **Composite Primærnøkkel**: `(id, competition_date)` - begge felter inngår
+- 📅 **competition_date** må ALLTID settes før WriteResultsAsync kalles
 - 📝 **eCard** kan være tom eller lik for flere deltakere (ikke nøkkel)
 - ✅ Alle resultater fra Access DB sendes til Supabase (ingen deduplikering)
-- 🔄 Duplikate ID-er i samme batch vil gi feil (skal ikke skje i normal drift)
+- 🔄 Samme ID i forskjellige løp er OK - de får separate rader
+
+## Poeng (Ranking Points)
+
+**VIKTIG:** Poeng leses direkte fra Access DB uten modifikasjon.
+
+### Hvordan det fungerer
+
+1. **Access DB**: Kolonne `points` i `Name`-tabellen
+2. **Applikasjon**: Leser `points` og sender til Supabase UTEN beregning
+3. **Supabase**: Lagrer poeng eksakt som i Access DB
+
+### Arbeidsflyt for poeng
+
+1. **Etter løpet**: Resultater lastes inn i Access DB
+2. **Juster for ugyldige strekk**: Manuelt eller via applikasjonen
+3. **Sett poeng**: Manuelt i Access DB basert på justerte tider
+4. **Kjør applikasjon**: Poeng overføres eksakt som de er
+
+### ⚠️ Tidligere versjon (før v2.0)
+
+Tidligere versjoner beregnet poeng automatisk basert på formelen:
+```
+points = (vinnertid / løpertid) * 1000
+```
+
+Dette er nå **DEAKTIVERT** fordi:
+- Poeng skal settes etter justering for ugyldige strekk
+- Automatisk beregning overskrev manuelt satte verdier
+- Status != 'A' fikk automatisk blanke poeng
+
+### Hvis du vil ha automatisk beregning tilbake
+
+I `ResultTransferService.cs`, fjern kommentar på linje 266-275:
+```csharp
+if (results.Count > 0)
+{
+    Log("📊 Calculating ranking points per class...", LogLevel.Information);
+    var pointsCalculated = CalculateRankingPoints(results);
+    ...
+}
+```
+
+**ADVARSEL:** Dette vil overskrive poeng fra Access DB!

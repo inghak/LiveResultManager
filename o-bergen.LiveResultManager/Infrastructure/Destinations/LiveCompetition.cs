@@ -51,6 +51,10 @@ public class LiveCompetition : BaseModel
     [JsonProperty("status")]
     public string Status { get; set; } = "live";
 
+    [Column("race_number")]
+    [JsonProperty("race_number")]
+    public int RaceNumber { get; set; } = 0;
+
     [Column("created_at")]
     [JsonProperty("created_at", NullValueHandling = NullValueHandling.Ignore)]
     public DateTime? CreatedAt { get; set; }

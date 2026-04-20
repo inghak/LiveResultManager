@@ -79,8 +79,10 @@ namespace OBergen.LiveResults
             try
             {
                 // Upsert: oppdaterer hvis finnes, oppretter hvis ikke
+                // Bruker composite key (id, competition_date) for å skille mellom forskjellige løp
                 var response = await _supabase
                     .From<LiveResult>()
+                    .OnConflict("id,competition_date")
                     .Upsert(liveResult);
 
                 if (response.Models.Count > 0)
@@ -118,6 +120,7 @@ namespace OBergen.LiveResults
             {
                 var response = await _supabase
                     .From<LiveResult>()
+                    .OnConflict("id,competition_date")
                     .Upsert(liveResults);
 
                 successCount = response.Models.Count;

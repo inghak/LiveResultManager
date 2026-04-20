@@ -49,6 +49,7 @@ public class SupabaseResultDestination : IResultDestination
             Organizer = metadata.Organizer,
             EventType = metadata.EventType,
             TerrainType = metadata.TerrainType,
+            RaceNumber = metadata.RaceNumber,
             Courses = metadata.Courses?.Select(c => new SupabaseCourse
             {
                 Name = c.Name,
@@ -92,7 +93,7 @@ public class SupabaseResultDestination : IResultDestination
         {
             await _client
                 .From<LiveResult>()
-                .OnConflict("id")
+                .OnConflict("id,competition_date")
                 .Upsert(liveResults);
 
             // Upsert doesn't always return models in response, so return the count we attempted to write
@@ -228,14 +229,16 @@ public class SupabaseResultDestination : IResultDestination
 /// <summary>
 /// Supabase model for live_results table
 /// Matches existing LiveResult from OBergen.LiveResults
+/// IMPORTANT: Composite primary key (id, competition_date) to separate different races
 /// </summary>
 [Table("live_results")]
 public class LiveResult : BaseModel
 {
-    [PrimaryKey("id", true)]
+    [PrimaryKey("id", false)]
     [JsonProperty("id")]
     public string Id { get; set; } = string.Empty;
 
+    [PrimaryKey("competition_date", false)]
     [Column("competition_date")]
     [JsonProperty("competition_date")]
     public string CompetitionDate { get; set; } = string.Empty;

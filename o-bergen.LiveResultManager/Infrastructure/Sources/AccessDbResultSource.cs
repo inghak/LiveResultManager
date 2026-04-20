@@ -52,6 +52,7 @@ public class AccessDbResultSource : IResultSource
                 var arrPlace = GetString(reader, "eventplace");
 
                 metadata.Day = day;
+                metadata.RaceNumber = day; // SUB field = race number in season series
                 metadata.Organizer = GetString(reader, "Organizator");
                 metadata.Location = arrPlace;
 
@@ -158,6 +159,32 @@ public class AccessDbResultSource : IResultSource
         {
             return Task.FromResult<DateTime?>(null);
         }
+    }
+
+    /// <summary>
+    /// Reads all participants from Name table regardless of status, for duplicate detection
+    /// </summary>
+    public async Task<List<Core.Models.ParticipantEntry>> FetchAllParticipantsAsync(CancellationToken cancellationToken = default)
+    {
+        var participants = new List<Core.Models.ParticipantEntry>();
+
+        using var connection = new OdbcConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        using var command = new OdbcCommand("SELECT id, name, ename, ecard, class FROM Name", connection);
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            participants.Add(new Core.Models.ParticipantEntry(
+                Id: GetString(reader, "id"),
+                FirstName: GetString(reader, "name"),
+                LastName: GetString(reader, "ename"),
+                ECard: GetString(reader, "ecard"),
+                Class: GetString(reader, "class")));
+        }
+
+        return participants;
     }
 
     /// <summary>
@@ -472,5 +499,236 @@ public class AccessDbResultSource : IResultSource
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Merges a duplicate participant into a target participant.
+    /// Updates the multi table so the removed ID's day entries point to the kept ID,
+    /// then deletes the removed participant from the Name table.
+    /// Handles the case where both IDs have entries for the same day (composite key id+day).
+    /// Uses DELETE+INSERT instead of UPDATE since multi.id is part of the composite PK
+    /// and cannot be updated via ODBC.
+    /// </summary>
+    public async Task MergeDuplicateAsync(string keepId, string removeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = new OdbcConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        // Step 1: Find which days the keepId already covers
+        var keepDays = new HashSet<int>();
+        using (var cmd = new OdbcCommand("SELECT day FROM multi WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(keepId));
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                keepDays.Add(GetInt(reader, "day"));
+        }
+
+        // Step 2: Find which days the removeId has
+        var removeDays = new List<int>();
+        using (var cmd = new OdbcCommand("SELECT day FROM multi WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                removeDays.Add(GetInt(reader, "day"));
+        }
+
+        // Step 3: For days that keepId doesn't have yet, copy the row to keepId then delete original.
+        // Cannot use UPDATE since multi.id is part of the composite primary key (id, day).
+        foreach (var day in removeDays.Where(d => !keepDays.Contains(d)))
+            await CopyMultiRowAsync(connection, removeId, keepId, day, cancellationToken);
+
+        // Step 4: Delete remaining removeId entries (days already covered by keepId, or already copied)
+        using (var cmd = new OdbcCommand("DELETE FROM multi WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Step 5: Delete the removed participant from Name table
+        using (var cmd = new OdbcCommand("DELETE FROM Name WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Finds a safe temporary ID that does not conflict with any existing ID in the Name table.
+    /// Returns (max numeric ID + 1) as a string.
+    /// </summary>
+    public async Task<string> FindSafeTempIdAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = new OdbcConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        var maxId = 0;
+        using var cmd = new OdbcCommand("SELECT id FROM Name", connection);
+        using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var raw = GetString(reader, "id");
+            if (int.TryParse(raw, out var n) && n > maxId)
+                maxId = n;
+        }
+
+        return (maxId + 1).ToString();
+    }
+
+    /// <summary>
+    /// "Overfør fra ny": beholder keepId sitt løpernummer men kopierer alle Name-felt
+    /// (unntatt id) fra removeId til keepId via UPDATE.
+    /// Note: Name.id er AutoNumber i Access og kan ikke oppdateres via ODBC.
+    /// </summary>
+    public async Task SwapMergeDuplicateAsync(string keepId, string removeId, CancellationToken cancellationToken = default)
+    {
+        using var connection = new OdbcConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        // Phase 1: Read all fields from removeId's Name row
+        List<string> removeColumns;
+        List<object?> removeValues;
+        using (var cmd = new OdbcCommand("SELECT * FROM Name WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                throw new InvalidOperationException($"Participant #{removeId} not found in Name table.");
+
+            var count = reader.FieldCount;
+            removeColumns = new List<string>(count);
+            removeValues  = new List<object?>(count);
+            for (var i = 0; i < count; i++)
+            {
+                removeColumns.Add(reader.GetName(i));
+                removeValues.Add(reader.IsDBNull(i) ? null : reader.GetValue(i));
+            }
+        }
+
+        // Phase 2: Merge non-conflicting multi rows from removeId onto keepId
+        var keepDays = new HashSet<int>();
+        using (var cmd = new OdbcCommand("SELECT day FROM multi WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(keepId));
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                keepDays.Add(GetInt(reader, "day"));
+        }
+
+        var removeDays = new List<int>();
+        using (var cmd = new OdbcCommand("SELECT day FROM multi WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                removeDays.Add(GetInt(reader, "day"));
+        }
+
+        foreach (var day in removeDays.Where(d => !keepDays.Contains(d)))
+            await CopyMultiRowAsync(connection, removeId, keepId, day, cancellationToken);
+
+        // Phase 3: Delete removeId entirely BEFORE updating keepId.
+        // This avoids unique-index violations (e.g. on ecard, bib) that would occur
+        // if both rows exist simultaneously with the same field values during the UPDATE.
+        using (var cmd = new OdbcCommand("DELETE FROM multi WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        using (var cmd = new OdbcCommand("DELETE FROM Name WHERE id = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(removeId));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Phase 4: UPDATE keepId's Name row with all fields from removeId (except id).
+        // removeId is now deleted, so no unique-index conflict can occur.
+        var setClauses = new List<string>();
+        var setValues  = new List<object?>();
+        for (var i = 0; i < removeColumns.Count; i++)
+        {
+            if (removeColumns[i].Equals("id", StringComparison.OrdinalIgnoreCase))
+                continue;
+            setClauses.Add($"[{removeColumns[i]}] = ?");
+            setValues.Add(removeValues[i]);
+        }
+
+        if (setClauses.Count > 0)
+        {
+            using var cmd = new OdbcCommand(
+                $"UPDATE Name SET {string.Join(", ", setClauses)} WHERE id = ?", connection);
+            foreach (var val in setValues)
+                cmd.Parameters.AddWithValue("@p", val ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@keepId", IdParam(keepId));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Converts a string participant ID to the appropriate numeric type for ODBC parameters.
+    /// Access DB stores participant IDs as Long Integer; passing a string causes implicit
+    /// conversion that is driver-dependent. This ensures we pass the correct type.
+    /// </summary>
+    private static object IdParam(string id) =>
+        int.TryParse(id, out var n) ? (object)n : id;
+
+    /// <summary>
+    /// Copies a single multi row
+    /// Used instead of UPDATE since multi.id is part of the composite primary key (id, day)
+    /// and cannot be updated via ODBC.
+    /// All columns are read dynamically so no schema knowledge is required.
+    /// </summary>
+    private static async Task CopyMultiRowAsync(
+        OdbcConnection connection, string fromId, string toId, int day, CancellationToken ct)
+    {
+        List<string> columns;
+        List<object?> values;
+
+        using (var cmd = new OdbcCommand("SELECT * FROM multi WHERE id = ? AND day = ?", connection))
+        {
+            cmd.Parameters.AddWithValue("@id", IdParam(fromId));
+            cmd.Parameters.AddWithValue("@day", day);
+            using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct))
+                return;
+
+            var count = reader.FieldCount;
+            columns = new List<string>(count);
+            values = new List<object?>(count);
+            for (var i = 0; i < count; i++)
+            {
+                columns.Add(reader.GetName(i));
+                values.Add(reader.IsDBNull(i) ? null : reader.GetValue(i));
+            }
+        }
+
+        // Override id column with toId, preserving the original numeric type if applicable
+        var idIdx = columns.FindIndex(c => c.Equals("id", StringComparison.OrdinalIgnoreCase));
+        if (idIdx >= 0)
+        {
+            var original = values[idIdx];
+            values[idIdx] = original switch
+            {
+                int    => int.TryParse(toId, out var i32) ? (object)i32 : toId,
+                long   => long.TryParse(toId, out var i64) ? (object)i64 : toId,
+                short  => short.TryParse(toId, out var i16) ? (object)i16 : toId,
+                _      => IdParam(toId)   // fall back to IdParam for unknown numeric types
+            };
+        }
+
+        var colList = string.Join(", ", columns.Select(c => $"[{c}]"));
+        var paramList = string.Join(", ", columns.Select(_ => "?"));
+        using (var insertCmd = new OdbcCommand($"INSERT INTO multi ({colList}) VALUES ({paramList})", connection))
+        {
+            foreach (var val in values)
+                insertCmd.Parameters.AddWithValue("@p", val ?? DBNull.Value);
+            await insertCmd.ExecuteNonQueryAsync(ct);
+        }
+
+        using var deleteCmd = new OdbcCommand("DELETE FROM multi WHERE id = ? AND day = ?", connection);
+        deleteCmd.Parameters.AddWithValue("@id", IdParam(fromId));
+        deleteCmd.Parameters.AddWithValue("@day", day);
+        await deleteCmd.ExecuteNonQueryAsync(ct);
     }
 }

@@ -29,11 +29,14 @@
         private void InitializeComponent()
         {
             components = new System.ComponentModel.Container();
+            menuStrip = new MenuStrip();
+            menuItemMisc = new ToolStripMenuItem();
+            menuItemInvalidStretches = new ToolStripMenuItem();
+            menuItemDuplicates = new ToolStripMenuItem();
             grpStatus = new GroupBox();
             lblStatusBadge = new Label();
             lblStatus = new Label();
             grpControls = new GroupBox();
-            btnManageStretches = new Button();
             btnClearLog = new Button();
             btnStop = new Button();
             btnStart = new Button();
@@ -55,6 +58,7 @@
             grpLog = new GroupBox();
             txtLog = new TextBox();
             timerStatusBlink = new System.Windows.Forms.Timer(components);
+            menuStrip.SuspendLayout();
             grpStatus.SuspendLayout();
             grpControls.SuspendLayout();
             grpConfiguration.SuspendLayout();
@@ -63,14 +67,44 @@
             grpLog.SuspendLayout();
             SuspendLayout();
             // 
+            // menuStrip
+            // 
+            menuStrip.Items.AddRange(new ToolStripItem[] { menuItemMisc });
+            menuStrip.Location = new Point(0, 0);
+            menuStrip.Name = "menuStrip";
+            menuStrip.Size = new Size(984, 24);
+            menuStrip.TabIndex = 10;
+            // 
+            // menuItemMisc
+            // 
+            menuItemMisc.DropDownItems.AddRange(new ToolStripItem[] { menuItemInvalidStretches, menuItemDuplicates });
+            menuItemMisc.Name = "menuItemMisc";
+            menuItemMisc.Size = new Size(44, 20);
+            menuItemMisc.Text = "Misc";
+            // 
+            // menuItemInvalidStretches
+            // 
+            menuItemInvalidStretches.Name = "menuItemInvalidStretches";
+            menuItemInvalidStretches.Size = new Size(185, 22);
+            menuItemInvalidStretches.Text = "Invalid Stretches";
+            menuItemInvalidStretches.Click += menuItemInvalidStretches_Click;
+            // 
+            // menuItemDuplicates
+            // 
+            menuItemDuplicates.Name = "menuItemDuplicates";
+            menuItemDuplicates.Size = new Size(185, 22);
+            menuItemDuplicates.Text = "Duplicates";
+            menuItemDuplicates.Click += menuItemDuplicates_Click;
+            // 
             // grpStatus
             // 
             grpStatus.Controls.Add(lblStatusBadge);
             grpStatus.Controls.Add(lblStatus);
-            grpStatus.Location = new Point(12, 12);
+            grpStatus.Location = new Point(12, 36);
             grpStatus.Name = "grpStatus";
             grpStatus.Size = new Size(960, 70);
             grpStatus.TabIndex = 0;
+            grpStatus.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             grpStatus.TabStop = false;
             grpStatus.Text = "Status";
             // 
@@ -98,26 +132,15 @@
             // 
             // grpControls
             // 
-            grpControls.Controls.Add(btnManageStretches);
             grpControls.Controls.Add(btnClearLog);
             grpControls.Controls.Add(btnStop);
             grpControls.Controls.Add(btnStart);
-            grpControls.Location = new Point(12, 88);
+            grpControls.Location = new Point(12, 112);
             grpControls.Name = "grpControls";
-            grpControls.Size = new Size(470, 100);
+            grpControls.Size = new Size(470, 70);
             grpControls.TabIndex = 1;
             grpControls.TabStop = false;
             grpControls.Text = "Controls";
-            // 
-            // btnManageStretches
-            // 
-            btnManageStretches.Location = new Point(6, 60);
-            btnManageStretches.Name = "btnManageStretches";
-            btnManageStretches.Size = new Size(458, 35);
-            btnManageStretches.TabIndex = 3;
-            btnManageStretches.Text = "Manage Invalid Stretches";
-            btnManageStretches.UseVisualStyleBackColor = true;
-            btnManageStretches.Click += btnManageStretches_Click;
             // 
             // btnClearLog
             // 
@@ -158,7 +181,7 @@
             grpConfiguration.Controls.Add(btnBrowseDb);
             grpConfiguration.Controls.Add(txtAccessDbPath);
             grpConfiguration.Controls.Add(lblAccessDb);
-            grpConfiguration.Location = new Point(12, 194);
+            grpConfiguration.Location = new Point(12, 188);
             grpConfiguration.Name = "grpConfiguration";
             grpConfiguration.Size = new Size(470, 150);
             grpConfiguration.TabIndex = 2;
@@ -228,7 +251,7 @@
             grpStatistics.Controls.Add(lblSuccessRate);
             grpStatistics.Controls.Add(lblRecordsWritten);
             grpStatistics.Controls.Add(lblRecordsRead);
-            grpStatistics.Location = new Point(488, 88);
+            grpStatistics.Location = new Point(488, 112);
             grpStatistics.Name = "grpStatistics";
             grpStatistics.Size = new Size(484, 236);
             grpStatistics.TabIndex = 3;
@@ -303,7 +326,7 @@
             // grpLog
             // 
             grpLog.Controls.Add(txtLog);
-            grpLog.Location = new Point(12, 350);
+            grpLog.Location = new Point(12, 374);
             grpLog.Name = "grpLog";
             grpLog.Size = new Size(960, 288);
             grpLog.TabIndex = 4;
@@ -331,20 +354,24 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(984, 650);
+            ClientSize = new Size(984, 674);
             Controls.Add(grpLog);
             Controls.Add(grpStatistics);
             Controls.Add(grpConfiguration);
             Controls.Add(grpControls);
             Controls.Add(grpStatus);
+            Controls.Add(menuStrip);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             Icon = new Icon("Resources\\app-icon.ico");
+            MainMenuStrip = menuStrip;
             MaximizeBox = false;
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "O-Bergen Live Result Manager";
             FormClosing += Form1_FormClosing;
             Load += Form1_Load;
+            menuStrip.ResumeLayout(false);
+            menuStrip.PerformLayout();
             grpStatus.ResumeLayout(false);
             grpStatus.PerformLayout();
             grpControls.ResumeLayout(false);
@@ -356,6 +383,7 @@
             grpLog.ResumeLayout(false);
             grpLog.PerformLayout();
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
@@ -363,11 +391,14 @@
         private GroupBox grpStatus;
         private Label lblStatus;
         private Label lblStatusBadge;
+        private MenuStrip menuStrip;
+        private ToolStripMenuItem menuItemMisc;
+        private ToolStripMenuItem menuItemInvalidStretches;
+        private ToolStripMenuItem menuItemDuplicates;
         private GroupBox grpControls;
         private Button btnStart;
         private Button btnStop;
         private Button btnClearLog;
-        private Button btnManageStretches;
         private GroupBox grpConfiguration;
         private Label lblAccessDb;
         private TextBox txtAccessDbPath;

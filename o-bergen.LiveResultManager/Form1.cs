@@ -106,7 +106,7 @@ public partial class Form1 : Form
         Log("Log cleared.", LogLevel.Info);
     }
 
-    private async void btnManageStretches_Click(object sender, EventArgs e)
+    private async void menuItemInvalidStretches_Click(object sender, EventArgs e)
     {
         if (_invalidStretchService == null)
         {
@@ -118,19 +118,39 @@ public partial class Form1 : Form
             return;
         }
 
-        // Load event metadata if not already loaded
         if (_currentEventMetadata == null)
-        {
             await LoadEventMetadataAsync();
-        }
 
         using var form = new InvalidStretchManagementForm(_invalidStretchService, _currentEventMetadata);
         form.ShowDialog(this);
 
-        // Refresh invalid stretches display after dialog closes
         UpdateInvalidStretchesDisplay();
-
         Log("Invalid stretch management dialog closed.", LogLevel.Info);
+    }
+
+    private void menuItemDuplicates_Click(object sender, EventArgs e)
+    {
+        if (_resultSource is not Infrastructure.Sources.AccessDbResultSource accessDbSource)
+        {
+            MessageBox.Show(
+                "Duplicate detection is only available when using an Access Database source.",
+                "Feature Unavailable",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        Infrastructure.Destinations.SupabaseLookupService? lookup = null;
+        if (!string.IsNullOrWhiteSpace(_configuration.Supabase.Url) &&
+            !string.IsNullOrWhiteSpace(_configuration.Supabase.ApiKey))
+        {
+            lookup = new Infrastructure.Destinations.SupabaseLookupService(
+                _configuration.Supabase.Url,
+                _configuration.Supabase.ApiKey);
+        }
+
+        using var form = new UI.DuplicatesForm(accessDbSource, lookup);
+        form.ShowDialog(this);
     }
 
     private void btnBrowseDb_Click(object sender, EventArgs e)

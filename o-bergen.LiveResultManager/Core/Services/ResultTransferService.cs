@@ -268,10 +268,7 @@ public class ResultTransferService
             {
                 Log("📊 Calculating ranking points per class...", LogLevel.Information);
                 var pointsCalculated = CalculateRankingPoints(results);
-                if (pointsCalculated > 0)
-                {
-                    Log($"✅ Calculated ranking points for {pointsCalculated} competitor(s)", LogLevel.Success);
-                }
+                Log($"✅ Calculated ranking points for {pointsCalculated} competitor(s) with Status='A'", LogLevel.Success);
             }
 
             // Step 5: Write to destination
@@ -376,12 +373,26 @@ public class ResultTransferService
                 .Where(x => x.TimeInSeconds > 0)
                 .ToList();
 
+            // Log competitors with Status='A' but invalid time
+            var invalidTimeCompetitors = classGroup
+                .Where(r => r.Status == "A" && (string.IsNullOrWhiteSpace(r.Time) || ParseTimeToSeconds(r.Time) == 0))
+                .ToList();
+
+            if (invalidTimeCompetitors.Count > 0)
+            {
+                foreach (var comp in invalidTimeCompetitors)
+                {
+                    Log($"⚠️ Status='A' but invalid time: {comp.FirstName} {comp.LastName} (ID: {comp.Id}, eCard: {comp.ECard}), Time='{comp.Time}' → Points='0'", LogLevel.Warning);
+                    comp.Points = "0";
+                }
+            }
+
             if (validResults.Count == 0)
             {
-                // Set empty points for all in this class
+                // Set 0 points for all in this class (no valid results)
                 foreach (var result in classGroup)
                 {
-                    result.Points = string.Empty;
+                    result.Points = "0";
                 }
                 continue;
             }
@@ -397,10 +408,10 @@ public class ResultTransferService
                 totalCalculated++;
             }
 
-            // Set points to empty string for competitors who did not finish with OK status
+            // Set 0 points for competitors who did not finish with OK status
             foreach (var result in classGroup.Where(r => r.Status != "A"))
             {
-                result.Points = string.Empty;
+                result.Points = "0";
             }
         }
 
@@ -419,7 +430,25 @@ public class ResultTransferService
         if (int.TryParse(timeString, out var seconds))
             return seconds;
 
-        // Try parse as time format (mm:ss or hh:mm:ss)
+        // Handle MM:SS format explicitly (most common from eTiming)
+        if (timeString.Contains(':'))
+        {
+            var parts = timeString.Split(':');
+
+            // MM:SS format
+            if (parts.Length == 2 && int.TryParse(parts[0], out int minutes) && int.TryParse(parts[1], out int secs))
+            {
+                return minutes * 60 + secs;
+            }
+
+            // HH:MM:SS format
+            if (parts.Length == 3 && int.TryParse(parts[0], out int hours) && int.TryParse(parts[1], out int mins) && int.TryParse(parts[2], out int sec))
+            {
+                return hours * 3600 + mins * 60 + sec;
+            }
+        }
+
+        // Fallback: try TimeSpan.Parse (shouldn't be needed now)
         if (TimeSpan.TryParse(timeString, out var timeSpan))
             return (int)timeSpan.TotalSeconds;
 
